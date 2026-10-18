@@ -34,7 +34,7 @@ func TestFormatTable_Sections(t *testing.T) {
 		},
 	}
 
-	out := FormatTable(prs, pipelines, now)
+	out := FormatTable(prs, pipelines, nil, nil, now)
 
 	for _, want := range []string{
 		"GITHUB", "open PRs", "482", "fix-auth token refresh", "jsmith", "12m ago",
@@ -53,7 +53,7 @@ func TestFormatTable_PipelineNone(t *testing.T) {
 		{Repo: "davaba86/daily-pulse", Status: model.PipelineNone, Branch: "main"},
 	}
 
-	out := FormatTable(nil, pipelines, fixedNow())
+	out := FormatTable(nil, pipelines, nil, nil, fixedNow())
 
 	var fields []string
 	for _, line := range strings.Split(out, "\n") {
@@ -70,9 +70,31 @@ func TestFormatTable_PipelineNone(t *testing.T) {
 }
 
 func TestFormatTable_NoPullRequests(t *testing.T) {
-	out := FormatTable(nil, nil, fixedNow())
+	out := FormatTable(nil, nil, nil, nil, fixedNow())
 	if !strings.Contains(out, "0 open PRs/MRs") {
 		t.Errorf("FormatTable() with no PRs missing summary line, got:\n%s", out)
+	}
+}
+
+func TestFormatTable_JiraSections(t *testing.T) {
+	now := fixedNow()
+	open := []model.JiraTicket{
+		{Key: "ENG-482", Summary: "Fix auth token refresh", Status: "In Progress", UpdatedAt: now.Add(-12 * time.Minute)},
+	}
+	completed := []model.JiraTicket{
+		{Key: "ENG-470", Summary: "Bump terraform providers", UpdatedAt: now.Add(-48 * time.Hour)},
+	}
+
+	out := FormatTable(nil, nil, open, completed, now)
+
+	for _, want := range []string{
+		"JIRA · open", "ENG-482", "Fix auth token refresh", "In Progress", "12m ago",
+		"JIRA · completed recently", "ENG-470", "Bump terraform providers", "2d ago",
+		"1 open tickets",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("FormatTable() missing %q in output:\n%s", want, out)
+		}
 	}
 }
 
