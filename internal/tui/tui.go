@@ -38,6 +38,7 @@ type Model struct {
 	table         table.Model
 	prs           []model.PullRequest // same order as table rows, for URL lookup on Enter
 	pipelinesText string
+	width         int
 	open          opener
 	quitting      bool
 	status        string
@@ -68,7 +69,7 @@ func NewModel(prs []model.PullRequest, now time.Time, pipelinesText string, widt
 		table.WithHeight(clampTableHeight(height, len(rows))+tableHeaderHeight),
 	)
 
-	return Model{table: t, prs: sorted, pipelinesText: pipelinesText, open: open}
+	return Model{table: t, prs: sorted, pipelinesText: pipelinesText, width: width, open: open}
 }
 
 func (m Model) Init() tea.Cmd {
@@ -98,8 +99,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
 		pipelineLines := strings.Count(m.pipelinesText, "\n")
-		available := msg.Height - pipelineLines - 2
+		// -3 accounts for the blank line after the table, the divider
+		// before the status line, and the divider before pipelinesText
+		// when present (approximate — a tall PR list may be off by a
+		// line or two, which just means the last row scrolls slightly).
+		available := msg.Height - pipelineLines - 3
 		m.table.SetHeight(clampTableHeight(available, len(m.prs)) + tableHeaderHeight)
 	}
 
@@ -116,7 +122,21 @@ func (m Model) View() string {
 	if status == "" {
 		status = helpText
 	}
-	return m.table.View() + "\n\n" + m.pipelinesText + "\n" + status
+
+	divider := strings.Repeat("─", max(m.width, 1))
+
+	var b strings.Builder
+	b.WriteString(m.table.View())
+	b.WriteString("\n")
+	if m.pipelinesText != "" {
+		b.WriteString(divider)
+		b.WriteString("\n")
+		b.WriteString(m.pipelinesText)
+	}
+	b.WriteString(divider)
+	b.WriteString("\n")
+	b.WriteString(status)
+	return b.String()
 }
 
 // Run starts the full-screen interactive session, blocking until the

@@ -135,3 +135,21 @@ func TestView_IncludesPipelinesText(t *testing.T) {
 		t.Error("View() should include the pipelines text")
 	}
 }
+
+func TestView_DividersBetweenSections(t *testing.T) {
+	m := NewModel(testPRs(), time.Now(), "PIPELINES TEXT\n\n", 20, 24, func(string) error { return nil })
+
+	divider := strings.Repeat("─", 20)
+	if got := strings.Count(m.View(), divider); got != 2 {
+		t.Errorf("View() divider count = %d, want 2 (before pipelines, before status)", got)
+	}
+}
+
+func TestView_NoDividerBeforeEmptyPipelines(t *testing.T) {
+	m := NewModel(testPRs(), time.Now(), "", 20, 24, func(string) error { return nil })
+
+	divider := strings.Repeat("─", 20)
+	if got := strings.Count(m.View(), divider); got != 1 {
+		t.Errorf("View() divider count = %d, want 1 (only before status, since pipelines text is empty)", got)
+	}
+}
