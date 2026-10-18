@@ -46,7 +46,7 @@ func TestFetchPullRequests_GitHub(t *testing.T) {
 
 func TestFetchPipelineStatus_GitHub(t *testing.T) {
 	runner := fakeRunner(t, map[string]string{
-		"repos/davaba86/mc-platform-cloud":                                      "testdata/github_repo.json",
+		"repos/davaba86/mc-platform-cloud":                                     "testdata/github_repo.json",
 		"repos/davaba86/mc-platform-cloud/actions/runs?branch=main&per_page=1": "testdata/github_runs.json",
 	})
 
@@ -64,7 +64,7 @@ func TestFetchPipelineStatus_GitHub(t *testing.T) {
 
 func TestFetchPipelineStatus_GitHub_NoRuns(t *testing.T) {
 	runner := fakeRunner(t, map[string]string{
-		"repos/davaba86/mc-platform-cloud":                                      "testdata/github_repo.json",
+		"repos/davaba86/mc-platform-cloud":                                     "testdata/github_repo.json",
 		"repos/davaba86/mc-platform-cloud/actions/runs?branch=main&per_page=1": "testdata/github_runs_empty.json",
 	})
 
