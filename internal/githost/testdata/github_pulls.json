@@ -1,0 +1,10 @@
+[
+  {
+    "number": 482,
+    "title": "fix-auth token refresh",
+    "html_url": "https://github.com/davaba86/mc-platform-cloud/pull/482",
+    "updated_at": "2026-10-18T07:50:00Z",
+    "user": { "login": "davaba86" },
+    "requested_reviewers": [{ "login": "jsmith" }]
+  }
+]
