@@ -81,7 +81,11 @@ func NewRootCommand() *cobra.Command {
 			now := time.Now()
 
 			if useMock {
-				cmd.Print(render.FormatTable(mockdata.PullRequests(), mockdata.PipelineRuns(), now))
+				cmd.Print(render.FormatTable(
+					mockdata.PullRequests(), mockdata.PipelineRuns(),
+					mockdata.JiraOpenTickets(), mockdata.JiraCompletedTickets(),
+					now,
+				))
 				return nil
 			}
 
@@ -108,7 +112,7 @@ func NewRootCommand() *cobra.Command {
 				return err
 			}
 
-			cmd.Print(render.FormatTable(prs, pipelines, now))
+			cmd.Print(render.FormatTable(prs, pipelines, nil, nil, now))
 			return nil
 		},
 	}
