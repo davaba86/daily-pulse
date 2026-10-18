@@ -23,3 +23,16 @@ func TestRootCommand_Mock(t *testing.T) {
 		}
 	}
 }
+
+func TestRootCommand_MissingConfig(t *testing.T) {
+	cmd := NewRootCommand()
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	cmd.SetArgs([]string{"--config", "/nonexistent/config.yaml"})
+
+	err := cmd.Execute()
+	if err == nil {
+		t.Fatal("Execute() error = nil, want error for missing config")
+	}
+}
