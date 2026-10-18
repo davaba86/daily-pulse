@@ -136,20 +136,21 @@ func TestView_IncludesPipelinesText(t *testing.T) {
 	}
 }
 
-func TestView_DividersBetweenSections(t *testing.T) {
-	m := NewModel(testPRs(), time.Now(), "PIPELINES TEXT\n\n", 20, 24, func(string) error { return nil })
+func TestView_BorderedBoxes(t *testing.T) {
+	m := NewModel(testPRs(), time.Now(), "PIPELINES TEXT\n\n", 40, 24, func(string) error { return nil })
 
-	divider := strings.Repeat("─", 20)
-	if got := strings.Count(m.View(), divider); got != 2 {
-		t.Errorf("View() divider count = %d, want 2 (before pipelines, before status)", got)
+	view := m.View()
+	for _, want := range []string{"╭", "╮", "╰", "╯", "OPEN PRs/MRs", "PIPELINES TEXT"} {
+		if !strings.Contains(view, want) {
+			t.Errorf("View() missing %q (expected a bordered box around each section), got:\n%s", want, view)
+		}
 	}
 }
 
-func TestView_NoDividerBeforeEmptyPipelines(t *testing.T) {
-	m := NewModel(testPRs(), time.Now(), "", 20, 24, func(string) error { return nil })
+func TestView_NoBoxForEmptyPipelines(t *testing.T) {
+	m := NewModel(testPRs(), time.Now(), "", 40, 24, func(string) error { return nil })
 
-	divider := strings.Repeat("─", 20)
-	if got := strings.Count(m.View(), divider); got != 1 {
-		t.Errorf("View() divider count = %d, want 1 (only before status, since pipelines text is empty)", got)
+	if got := strings.Count(m.View(), "╭"); got != 1 {
+		t.Errorf("View() top-border count = %d, want 1 (only the PR/MR box, since pipelines text is empty)", got)
 	}
 }

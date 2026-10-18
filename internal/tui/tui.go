@@ -7,12 +7,15 @@ import (
 
 	"github.com/charmbracelet/bubbles/table"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/davaba86/daily-pulse/internal/model"
 	"github.com/davaba86/daily-pulse/internal/render"
 )
 
 const helpText = "↑/↓ navigate · enter open in browser · esc/q quit"
+
+var boxStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(0, 1)
 
 // clampTableHeight returns how many data rows the table should show: never
 // more than rowCount (bubbles/table otherwise pads with blank rows to fill
@@ -38,7 +41,6 @@ type Model struct {
 	table         table.Model
 	prs           []model.PullRequest // same order as table rows, for URL lookup on Enter
 	pipelinesText string
-	width         int
 	open          opener
 	quitting      bool
 	status        string
@@ -69,7 +71,7 @@ func NewModel(prs []model.PullRequest, now time.Time, pipelinesText string, widt
 		table.WithHeight(clampTableHeight(height, len(rows))+tableHeaderHeight),
 	)
 
-	return Model{table: t, prs: sorted, pipelinesText: pipelinesText, width: width, open: open}
+	return Model{table: t, prs: sorted, pipelinesText: pipelinesText, open: open}
 }
 
 func (m Model) Init() tea.Cmd {
@@ -99,13 +101,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		pipelineLines := strings.Count(m.pipelinesText, "\n")
-		// -3 accounts for the blank line after the table, the divider
-		// before the status line, and the divider before pipelinesText
-		// when present (approximate — a tall PR list may be off by a
-		// line or two, which just means the last row scrolls slightly).
-		available := msg.Height - pipelineLines - 3
+		// Fixed overhead outside the table's own data rows: our "OPEN
+		// PRs/MRs" title line, the table's own header row, its box's
+		// top+bottom border, the blank line after the box, and the
+		// status line — 6 lines total, plus the PIPELINES box (its own
+		// content height + 2 border lines + 1 trailing blank) when
+		// present. Approximate — a tall PR list may end up a line or
+		// two off, which just means the last row scrolls slightly.
+		overhead := 6
+		if m.pipelinesText != "" {
+			overhead += strings.Count(m.pipelinesText, "\n") + 3
+		}
+		available := msg.Height - overhead
 		m.table.SetHeight(clampTableHeight(available, len(m.prs)) + tableHeaderHeight)
 	}
 
@@ -123,18 +130,13 @@ func (m Model) View() string {
 		status = helpText
 	}
 
-	divider := strings.Repeat("─", max(m.width, 1))
-
 	var b strings.Builder
-	b.WriteString(m.table.View())
+	b.WriteString(boxStyle.Render("OPEN PRs/MRs\n" + m.table.View()))
 	b.WriteString("\n")
 	if m.pipelinesText != "" {
-		b.WriteString(divider)
+		b.WriteString(boxStyle.Render(strings.TrimRight(m.pipelinesText, "\n")))
 		b.WriteString("\n")
-		b.WriteString(m.pipelinesText)
 	}
-	b.WriteString(divider)
-	b.WriteString("\n")
 	b.WriteString(status)
 	return b.String()
 }
