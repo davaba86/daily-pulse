@@ -34,7 +34,7 @@ func TestFormatTable_Sections(t *testing.T) {
 		},
 	}
 
-	out := FormatTable(prs, pipelines, now)
+	out := FormatTable(prs, pipelines, now, 0)
 
 	for _, want := range []string{
 		"OPEN PRs/MRs",
@@ -62,7 +62,7 @@ func TestFormatTable_PipelineNone(t *testing.T) {
 		{Repo: "davaba86/daily-pulse", Status: model.PipelineNone, Branch: "main"},
 	}
 
-	out := FormatTable(nil, pipelines, fixedNow())
+	out := FormatTable(nil, pipelines, fixedNow(), 0)
 
 	var fields []string
 	for _, line := range strings.Split(out, "\n") {
@@ -79,9 +79,40 @@ func TestFormatTable_PipelineNone(t *testing.T) {
 }
 
 func TestFormatTable_NoPullRequests(t *testing.T) {
-	out := FormatTable(nil, nil, fixedNow())
+	out := FormatTable(nil, nil, fixedNow(), 0)
 	if !strings.Contains(out, "0 open PRs/MRs") {
 		t.Errorf("FormatTable() with no PRs missing summary line, got:\n%s", out)
+	}
+}
+
+func TestFormatTable_StretchTitleColumn(t *testing.T) {
+	now := fixedNow()
+	prs := []model.PullRequest{
+		{Source: "github", Repo: "davaba86/x", Number: 1, Title: "short", Reviewers: []string{"jsmith"}, UpdatedAt: now},
+	}
+
+	natural := FormatTable(prs, nil, now, 0)
+	stretched := FormatTable(prs, nil, now, 120)
+
+	naturalIdx := strings.Index(natural, "jsmith")
+	stretchedIdx := strings.Index(stretched, "jsmith")
+	if naturalIdx == -1 || stretchedIdx == -1 || stretchedIdx <= naturalIdx {
+		t.Errorf("stretched REVIEWERS column should start further right than natural; natural idx=%d stretched idx=%d\nnatural:\n%s\nstretched:\n%s",
+			naturalIdx, stretchedIdx, natural, stretched)
+	}
+}
+
+func TestFormatTable_NoStretchWhenWidthTooSmall(t *testing.T) {
+	now := fixedNow()
+	prs := []model.PullRequest{
+		{Source: "github", Repo: "davaba86/x", Number: 1, Title: "a long enough title to exceed a tiny width", Reviewers: []string{"jsmith"}, UpdatedAt: now},
+	}
+
+	natural := FormatTable(prs, nil, now, 0)
+	tooSmall := FormatTable(prs, nil, now, 10)
+
+	if natural != tooSmall {
+		t.Errorf("width smaller than natural table width should not change output\nnatural:\n%s\ntooSmall:\n%s", natural, tooSmall)
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 
 	"github.com/davaba86/daily-pulse/internal/config"
 	"github.com/davaba86/daily-pulse/internal/githost"
@@ -24,6 +25,21 @@ func defaultConfigPath() string {
 func defaultStorePath() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".local", "share", "daily-pulse", "pulse.db")
+}
+
+// terminalWidth returns the current terminal's column width, or 0 when
+// stdout isn't a terminal (piped output, redirected to a file, or test
+// buffers) — render.FormatTable treats 0 as "don't stretch".
+func terminalWidth() int {
+	fd := int(os.Stdout.Fd())
+	if !term.IsTerminal(fd) {
+		return 0
+	}
+	width, _, err := term.GetSize(fd)
+	if err != nil {
+		return 0
+	}
+	return width
 }
 
 func fetchAll(cfg *config.Config, showAll bool) ([]model.PullRequest, []model.PipelineRun, error) {
@@ -81,7 +97,7 @@ func NewRootCommand() *cobra.Command {
 			now := time.Now()
 
 			if useMock {
-				cmd.Print(render.FormatTable(mockdata.PullRequests(), mockdata.PipelineRuns(), now))
+				cmd.Print(render.FormatTable(mockdata.PullRequests(), mockdata.PipelineRuns(), now, terminalWidth()))
 				return nil
 			}
 
@@ -108,7 +124,7 @@ func NewRootCommand() *cobra.Command {
 				return err
 			}
 
-			cmd.Print(render.FormatTable(prs, pipelines, now))
+			cmd.Print(render.FormatTable(prs, pipelines, now, terminalWidth()))
 			return nil
 		},
 	}
