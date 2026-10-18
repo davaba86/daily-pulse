@@ -55,8 +55,11 @@ func writePipelineSection(buf *bytes.Buffer, pipelines []model.PipelineRun, now 
 	tw := tabwriter.NewWriter(buf, 0, 0, 2, ' ', 0)
 	fmt.Fprintf(tw, "REPO\tSTATUS\tBRANCH\tDURATION\tUPDATED\n")
 	for _, p := range pipelines {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
-			p.Repo, string(p.Status), p.Branch, p.Duration.String(), relativeTime(p.UpdatedAt, now))
+		duration, updated := p.Duration.String(), relativeTime(p.UpdatedAt, now)
+		if p.Status == model.PipelineNone {
+			duration, updated = "—", "—"
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", p.Repo, string(p.Status), p.Branch, duration, updated)
 	}
 	tw.Flush()
 	buf.WriteString("\n")

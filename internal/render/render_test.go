@@ -48,6 +48,27 @@ func TestFormatTable_Sections(t *testing.T) {
 	}
 }
 
+func TestFormatTable_PipelineNone(t *testing.T) {
+	pipelines := []model.PipelineRun{
+		{Repo: "davaba86/daily-pulse", Status: model.PipelineNone, Branch: "main"},
+	}
+
+	out := FormatTable(nil, pipelines, fixedNow())
+
+	var fields []string
+	for _, line := range strings.Split(out, "\n") {
+		if strings.Contains(line, "davaba86/daily-pulse") {
+			fields = strings.Fields(line)
+		}
+	}
+	if len(fields) != 5 {
+		t.Fatalf("pipeline row fields = %v, want 5 fields (repo, status, branch, duration, updated)", fields)
+	}
+	if fields[3] != "—" || fields[4] != "—" {
+		t.Errorf("duration/updated = %q/%q, want —/— for a repo with no pipeline runs", fields[3], fields[4])
+	}
+}
+
 func TestFormatTable_NoPullRequests(t *testing.T) {
 	out := FormatTable(nil, nil, fixedNow())
 	if !strings.Contains(out, "0 open PRs/MRs") {
