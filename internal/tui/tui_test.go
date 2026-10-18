@@ -100,6 +100,34 @@ func TestView_EmptyWhenQuitting(t *testing.T) {
 	}
 }
 
+func TestClampTableHeight(t *testing.T) {
+	cases := []struct {
+		available, rowCount, want int
+	}{
+		{available: 30, rowCount: 3, want: 3}, // more space than rows: don't pad with blank rows
+		{available: 2, rowCount: 10, want: 2}, // less space than rows: cap to available, let it scroll
+		{available: 5, rowCount: 0, want: 1},  // no rows: still show at least 1 row of space
+		{available: 0, rowCount: 5, want: 1},  // no space: never go below 1
+		{available: -3, rowCount: 5, want: 1}, // negative available (tiny terminal): clamp to 1
+	}
+	for _, c := range cases {
+		if got := clampTableHeight(c.available, c.rowCount); got != c.want {
+			t.Errorf("clampTableHeight(%d, %d) = %d, want %d", c.available, c.rowCount, got, c.want)
+		}
+	}
+}
+
+func TestUpdate_WindowSizeClampsTableHeight(t *testing.T) {
+	m := NewModel(testPRs(), time.Now(), "", 80, 24, func(string) error { return nil })
+
+	updated, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 50})
+	model := updated.(Model)
+
+	if got := model.table.Height(); got != len(testPRs()) {
+		t.Errorf("table.Height() after large WindowSizeMsg = %d, want %d (row count, not full available space)", got, len(testPRs()))
+	}
+}
+
 func TestView_IncludesPipelinesText(t *testing.T) {
 	m := NewModel(testPRs(), time.Now(), "PIPELINES TEXT HERE", 80, 24, func(string) error { return nil })
 

@@ -14,6 +14,26 @@ import (
 
 const helpText = "↑/↓ navigate · enter open in browser · esc/q quit"
 
+// clampTableHeight returns how many data rows the table should show: never
+// more than rowCount (bubbles/table otherwise pads with blank rows to fill
+// whatever height it's given), never less than 1.
+func clampTableHeight(available, rowCount int) int {
+	h := available
+	if rowCount < h {
+		h = rowCount
+	}
+	if h < 1 {
+		h = 1
+	}
+	return h
+}
+
+// tableHeaderHeight is how many lines bubbles/table reserves for its
+// header row — table.Model's SetHeight/WithHeight both subtract this
+// internally, so callers passing a desired *data*-row count (as
+// clampTableHeight returns) need to add it back.
+const tableHeaderHeight = 1
+
 type Model struct {
 	table         table.Model
 	prs           []model.PullRequest // same order as table rows, for URL lookup on Enter
@@ -45,7 +65,7 @@ func NewModel(prs []model.PullRequest, now time.Time, pipelinesText string, widt
 		table.WithColumns(columns),
 		table.WithRows(rows),
 		table.WithFocused(true),
-		table.WithHeight(height),
+		table.WithHeight(clampTableHeight(height, len(rows))+tableHeaderHeight),
 	)
 
 	return Model{table: t, prs: sorted, pipelinesText: pipelinesText, open: open}
@@ -79,11 +99,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tea.WindowSizeMsg:
 		pipelineLines := strings.Count(m.pipelinesText, "\n")
-		tableHeight := msg.Height - pipelineLines - 2
-		if tableHeight < 1 {
-			tableHeight = 1
-		}
-		m.table.SetHeight(tableHeight)
+		available := msg.Height - pipelineLines - 2
+		m.table.SetHeight(clampTableHeight(available, len(m.prs)) + tableHeaderHeight)
 	}
 
 	var cmd tea.Cmd
