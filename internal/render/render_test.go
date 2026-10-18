@@ -37,14 +37,23 @@ func TestFormatTable_Sections(t *testing.T) {
 	out := FormatTable(prs, pipelines, now)
 
 	for _, want := range []string{
-		"GITHUB", "open PRs", "482", "fix-auth token refresh", "jsmith", "12m ago",
-		"GITLAB", "open MRs", "91", "add SSO login flow", "agupta", "5m ago",
+		"OPEN PRs/MRs",
+		"SOURCE", "GH", "482", "fix-auth token refresh", "jsmith", "12m ago",
+		"GL", "91", "add SSO login flow", "agupta", "5m ago",
 		"PIPELINES", "davaba86/mc-platform-cloud", "pass", "main", "3m12s",
 		"2 open PRs/MRs",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("FormatTable() missing %q in output:\n%s", want, out)
 		}
+	}
+
+	// gitlab PR updated 5m ago is more recent than github PR updated 12m
+	// ago, so it should render first.
+	glIdx := strings.Index(out, "GL")
+	ghIdx := strings.Index(out, "GH")
+	if glIdx == -1 || ghIdx == -1 || glIdx > ghIdx {
+		t.Errorf("FormatTable() rows not sorted by most-recently-updated first, got:\n%s", out)
 	}
 }
 

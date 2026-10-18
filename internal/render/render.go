@@ -3,6 +3,7 @@ package render
 import (
 	"bytes"
 	"fmt"
+	"sort"
 	"strings"
 	"text/tabwriter"
 	"time"
@@ -32,16 +33,31 @@ func reviewersCell(reviewers []string) string {
 	return strings.Join(reviewers, ", ")
 }
 
-func writePRSection(buf *bytes.Buffer, title string, prs []model.PullRequest, numberHeader string, now time.Time) {
+func sourceLabel(source string) string {
+	switch source {
+	case "github":
+		return "GH"
+	case "gitlab":
+		return "GL"
+	default:
+		return source
+	}
+}
+
+func writePRSection(buf *bytes.Buffer, prs []model.PullRequest, now time.Time) {
 	if len(prs) == 0 {
 		return
 	}
-	fmt.Fprintf(buf, "%s\n", title)
+	sorted := make([]model.PullRequest, len(prs))
+	copy(sorted, prs)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].UpdatedAt.After(sorted[j].UpdatedAt) })
+
+	buf.WriteString("OPEN PRs/MRs\n")
 	tw := tabwriter.NewWriter(buf, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(tw, "REPO\t%s\tTITLE\tREVIEWERS\tUPDATED\n", numberHeader)
-	for _, pr := range prs {
-		fmt.Fprintf(tw, "%s\t%d\t%s\t%s\t%s\n",
-			pr.Repo, pr.Number, pr.Title, reviewersCell(pr.Reviewers), relativeTime(pr.UpdatedAt, now))
+	fmt.Fprintf(tw, "SOURCE\tREPO\t#/!\tTITLE\tREVIEWERS\tUPDATED\n")
+	for _, pr := range sorted {
+		fmt.Fprintf(tw, "%s\t%s\t%d\t%s\t%s\t%s\n",
+			sourceLabel(pr.Source), pr.Repo, pr.Number, pr.Title, reviewersCell(pr.Reviewers), relativeTime(pr.UpdatedAt, now))
 	}
 	tw.Flush()
 	buf.WriteString("\n")
@@ -69,18 +85,7 @@ func FormatTable(prs []model.PullRequest, pipelines []model.PipelineRun, now tim
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "daily-pulse · %s\n\n", now.Format("2006-01-02 15:04"))
 
-	var githubPRs, gitlabPRs []model.PullRequest
-	for _, pr := range prs {
-		switch pr.Source {
-		case "github":
-			githubPRs = append(githubPRs, pr)
-		case "gitlab":
-			gitlabPRs = append(gitlabPRs, pr)
-		}
-	}
-
-	writePRSection(&buf, "GITHUB · open PRs", githubPRs, "#", now)
-	writePRSection(&buf, "GITLAB · open MRs", gitlabPRs, "!", now)
+	writePRSection(&buf, prs, now)
 	writePipelineSection(&buf, pipelines, now)
 
 	failing := 0
