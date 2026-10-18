@@ -15,6 +15,7 @@ import (
 	"github.com/davaba86/daily-pulse/internal/model"
 	"github.com/davaba86/daily-pulse/internal/render"
 	"github.com/davaba86/daily-pulse/internal/store"
+	"github.com/davaba86/daily-pulse/internal/tui"
 )
 
 func defaultConfigPath() string {
@@ -89,6 +90,7 @@ func NewRootCommand() *cobra.Command {
 	var useMock bool
 	var showAll bool
 	var configPath string
+	var interactive bool
 
 	cmd := &cobra.Command{
 		Use:   "daily-pulse",
@@ -97,7 +99,11 @@ func NewRootCommand() *cobra.Command {
 			now := time.Now()
 
 			if useMock {
-				cmd.Print(render.FormatTable(mockdata.PullRequests(), mockdata.PipelineRuns(), now, terminalWidth()))
+				output := render.FormatTable(mockdata.PullRequests(), mockdata.PipelineRuns(), now, terminalWidth())
+				if interactive {
+					return tui.Run(output)
+				}
+				cmd.Print(output)
 				return nil
 			}
 
@@ -124,7 +130,11 @@ func NewRootCommand() *cobra.Command {
 				return err
 			}
 
-			cmd.Print(render.FormatTable(prs, pipelines, now, terminalWidth()))
+			output := render.FormatTable(prs, pipelines, now, terminalWidth())
+			if interactive {
+				return tui.Run(output)
+			}
+			cmd.Print(output)
 			return nil
 		},
 	}
@@ -132,6 +142,7 @@ func NewRootCommand() *cobra.Command {
 	cmd.Flags().BoolVar(&useMock, "mock", false, "use mock data instead of live GitHub/GitLab calls")
 	cmd.Flags().BoolVar(&showAll, "all", false, "show PRs/MRs from everyone, not just you")
 	cmd.Flags().StringVar(&configPath, "config", defaultConfigPath(), "path to config.yaml")
+	cmd.Flags().BoolVar(&interactive, "interactive", false, "enter a full-screen scrollable session instead of printing once")
 
 	return cmd
 }

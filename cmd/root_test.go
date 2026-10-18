@@ -24,6 +24,17 @@ func TestRootCommand_Mock(t *testing.T) {
 	}
 }
 
+func TestRootCommand_InteractiveFlagRegistered(t *testing.T) {
+	cmd := NewRootCommand()
+	flag := cmd.Flags().Lookup("interactive")
+	if flag == nil {
+		t.Fatal("--interactive flag not registered")
+	}
+	if flag.DefValue != "false" {
+		t.Errorf("--interactive default = %q, want %q", flag.DefValue, "false")
+	}
+}
+
 func TestRootCommand_MissingConfig(t *testing.T) {
 	cmd := NewRootCommand()
 	var out bytes.Buffer
