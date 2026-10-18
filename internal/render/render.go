@@ -99,21 +99,60 @@ func writePRSection(buf *bytes.Buffer, prs []model.PullRequest, now time.Time, w
 	buf.WriteString("\n")
 }
 
+// padCell right-pads s with spaces to width, measured in runes. It's used
+// instead of tabwriter for the STATUS column because tabwriter counts
+// ANSI color escape bytes as visible width, which would misalign rows
+// where only some statuses (pass/fail/running, not none) get colorized.
+func padCell(s string, width int) string {
+	return s + strings.Repeat(" ", width-utf8.RuneCountInString(s))
+}
+
+// padColorized pads a colorized string to width, measured by the rune
+// count of its plain (uncolorized) form — padCell can't be used directly
+// since the ANSI escape runes in s would otherwise count toward width.
+func padColorized(colorized, plain string, width int) string {
+	return colorized + strings.Repeat(" ", width-utf8.RuneCountInString(plain))
+}
+
+func pipelineColumnWidths(pipelines []model.PipelineRun) (repo, status, branch, duration int) {
+	repo = utf8.RuneCountInString("REPO")
+	status = utf8.RuneCountInString("STATUS")
+	branch = utf8.RuneCountInString("BRANCH")
+	duration = utf8.RuneCountInString("DURATION")
+
+	for _, p := range pipelines {
+		d := p.Duration.String()
+		if p.Status == model.PipelineNone {
+			d = "—"
+		}
+		repo = max(repo, utf8.RuneCountInString(p.Repo))
+		status = max(status, utf8.RuneCountInString(string(p.Status)))
+		branch = max(branch, utf8.RuneCountInString(p.Branch))
+		duration = max(duration, utf8.RuneCountInString(d))
+	}
+	return
+}
+
 func writePipelineSection(buf *bytes.Buffer, pipelines []model.PipelineRun, now time.Time) {
 	if len(pipelines) == 0 {
 		return
 	}
+	repoW, statusW, branchW, durationW := pipelineColumnWidths(pipelines)
+
 	buf.WriteString("PIPELINES  (main/default branch)\n")
-	tw := tabwriter.NewWriter(buf, 0, 0, 2, ' ', 0)
-	fmt.Fprintf(tw, "REPO\tSTATUS\tBRANCH\tDURATION\tUPDATED\n")
+	fmt.Fprintf(buf, "%s  %s  %s  %s  %s\n",
+		padCell("REPO", repoW), padCell("STATUS", statusW), padCell("BRANCH", branchW),
+		padCell("DURATION", durationW), "UPDATED")
+
 	for _, p := range pipelines {
 		duration, updated := p.Duration.String(), relativeTime(p.UpdatedAt, now)
 		if p.Status == model.PipelineNone {
 			duration, updated = "—", "—"
 		}
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n", p.Repo, string(p.Status), p.Branch, duration, updated)
+		statusCell := padColorized(Colorize(string(p.Status)), string(p.Status), statusW)
+		fmt.Fprintf(buf, "%s  %s  %s  %s  %s\n",
+			padCell(p.Repo, repoW), statusCell, padCell(p.Branch, branchW), padCell(duration, durationW), updated)
 	}
-	tw.Flush()
 	buf.WriteString("\n")
 }
 
