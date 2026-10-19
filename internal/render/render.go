@@ -194,12 +194,35 @@ func PipelinesText(pipelines []model.PipelineRun, now time.Time) string {
 	return buf.String()
 }
 
-func FormatTable(prs []model.PullRequest, pipelines []model.PipelineRun, now time.Time, width int) string {
+func writeJiraSection(buf *bytes.Buffer, title string, tickets []model.JiraTicket, showStatus bool, now time.Time) {
+	if len(tickets) == 0 {
+		return
+	}
+	fmt.Fprintf(buf, "%s\n", title)
+	tw := tabwriter.NewWriter(buf, 0, 0, columnGap, ' ', 0)
+	if showStatus {
+		fmt.Fprintf(tw, "KEY\tSUMMARY\tSTATUS\tUPDATED\n")
+		for _, tk := range tickets {
+			fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", tk.Key, tk.Summary, tk.Status, relativeTime(tk.UpdatedAt, now))
+		}
+	} else {
+		fmt.Fprintf(tw, "KEY\tSUMMARY\tUPDATED\n")
+		for _, tk := range tickets {
+			fmt.Fprintf(tw, "%s\t%s\t%s\n", tk.Key, tk.Summary, relativeTime(tk.UpdatedAt, now))
+		}
+	}
+	tw.Flush()
+	buf.WriteString("\n")
+}
+
+func FormatTable(prs []model.PullRequest, pipelines []model.PipelineRun, openTickets, completedTickets []model.JiraTicket, now time.Time, width int) string {
 	var buf bytes.Buffer
 	fmt.Fprintf(&buf, "daily-pulse · %s\n\n", now.Format("2006-01-02 15:04"))
 
 	writePRSection(&buf, prs, now, width)
 	writePipelineSection(&buf, pipelines, now)
+	writeJiraSection(&buf, "JIRA · open (assigned or created by me)", openTickets, true, now)
+	writeJiraSection(&buf, "JIRA · completed recently (7d)", completedTickets, false, now)
 
 	failing := 0
 	for _, p := range pipelines {
@@ -207,7 +230,7 @@ func FormatTable(prs []model.PullRequest, pipelines []model.PipelineRun, now tim
 			failing++
 		}
 	}
-	fmt.Fprintf(&buf, "%d open PRs/MRs · %d pipeline failing\n", len(prs), failing)
+	fmt.Fprintf(&buf, "%d open PRs/MRs · %d open tickets · %d pipeline failing\n", len(prs), len(openTickets), failing)
 
 	return buf.String()
 }

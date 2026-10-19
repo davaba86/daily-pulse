@@ -41,7 +41,7 @@ func TestFormatTable_Sections(t *testing.T) {
 		},
 	}
 
-	out := FormatTable(prs, pipelines, now, 0)
+	out := FormatTable(prs, pipelines, nil, nil, now, 0)
 
 	for _, want := range []string{
 		"OPEN PRs/MRs",
@@ -69,7 +69,7 @@ func TestFormatTable_PipelineNone(t *testing.T) {
 		{Repo: "davaba86/daily-pulse", Status: model.PipelineNone, Branch: "main"},
 	}
 
-	out := FormatTable(nil, pipelines, fixedNow(), 0)
+	out := FormatTable(nil, pipelines, nil, nil, fixedNow(), 0)
 
 	var fields []string
 	for _, line := range strings.Split(out, "\n") {
@@ -86,7 +86,7 @@ func TestFormatTable_PipelineNone(t *testing.T) {
 }
 
 func TestFormatTable_NoPullRequests(t *testing.T) {
-	out := FormatTable(nil, nil, fixedNow(), 0)
+	out := FormatTable(nil, nil, nil, nil, fixedNow(), 0)
 	if !strings.Contains(out, "0 open PRs/MRs") {
 		t.Errorf("FormatTable() with no PRs missing summary line, got:\n%s", out)
 	}
@@ -98,8 +98,8 @@ func TestFormatTable_StretchTitleColumn(t *testing.T) {
 		{Source: "github", Repo: "davaba86/x", Number: 1, Title: "short", Reviewers: []string{"jsmith"}, UpdatedAt: now},
 	}
 
-	natural := FormatTable(prs, nil, now, 0)
-	stretched := FormatTable(prs, nil, now, 120)
+	natural := FormatTable(prs, nil, nil, nil, now, 0)
+	stretched := FormatTable(prs, nil, nil, nil, now, 120)
 
 	naturalIdx := strings.Index(natural, "jsmith")
 	stretchedIdx := strings.Index(stretched, "jsmith")
@@ -115,8 +115,8 @@ func TestFormatTable_NoStretchWhenWidthTooSmall(t *testing.T) {
 		{Source: "github", Repo: "davaba86/x", Number: 1, Title: "a long enough title to exceed a tiny width", Reviewers: []string{"jsmith"}, UpdatedAt: now},
 	}
 
-	natural := FormatTable(prs, nil, now, 0)
-	tooSmall := FormatTable(prs, nil, now, 10)
+	natural := FormatTable(prs, nil, nil, nil, now, 0)
+	tooSmall := FormatTable(prs, nil, nil, nil, now, 10)
 
 	if natural != tooSmall {
 		t.Errorf("width smaller than natural table width should not change output\nnatural:\n%s\ntooSmall:\n%s", natural, tooSmall)
@@ -152,7 +152,7 @@ func TestFormatTable_PipelineStatusColorizedAndAligned(t *testing.T) {
 		{Repo: "davaba86/y", Status: model.PipelineNone, Branch: "main"},
 	}
 
-	out := FormatTable(nil, pipelines, now, 0)
+	out := FormatTable(nil, pipelines, nil, nil, now, 0)
 
 	if !strings.Contains(out, "\x1b[") {
 		t.Fatalf("FormatTable() pipeline section missing ANSI color codes, got:\n%s", out)
@@ -239,6 +239,28 @@ func TestPipelinesText(t *testing.T) {
 	for _, want := range []string{"PIPELINES", "davaba86/x", "pass", "main"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("PipelinesText() missing %q, got:\n%s", want, out)
+		}
+	}
+}
+
+func TestFormatTable_JiraSections(t *testing.T) {
+	now := fixedNow()
+	open := []model.JiraTicket{
+		{Key: "ENG-482", Summary: "Fix auth token refresh", Status: "In Progress", UpdatedAt: now.Add(-12 * time.Minute)},
+	}
+	completed := []model.JiraTicket{
+		{Key: "ENG-470", Summary: "Bump terraform providers", UpdatedAt: now.Add(-48 * time.Hour)},
+	}
+
+	out := FormatTable(nil, nil, open, completed, now, 0)
+
+	for _, want := range []string{
+		"JIRA · open", "ENG-482", "Fix auth token refresh", "In Progress", "12m ago",
+		"JIRA · completed recently", "ENG-470", "Bump terraform providers", "2d ago",
+		"1 open tickets",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("FormatTable() missing %q in output:\n%s", want, out)
 		}
 	}
 }

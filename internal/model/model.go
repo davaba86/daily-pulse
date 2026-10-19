@@ -29,3 +29,10 @@ type PipelineRun struct {
 	Duration  time.Duration
 	UpdatedAt time.Time
 }
+
+type JiraTicket struct {
+	Key       string
+	Summary   string
+	Status    string // e.g. "In Progress", "To Do" — empty for completed tickets
+	UpdatedAt time.Time
+}

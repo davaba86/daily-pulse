@@ -61,3 +61,32 @@ func PipelineRuns() []model.PipelineRun {
 		},
 	}
 }
+
+func JiraOpenTickets() []model.JiraTicket {
+	now := time.Now()
+	return []model.JiraTicket{
+		{
+			Key:       "ENG-482",
+			Summary:   "Fix auth token refresh",
+			Status:    "In Progress",
+			UpdatedAt: now.Add(-12 * time.Minute),
+		},
+		{
+			Key:       "ENG-501",
+			Summary:   "Add SSO login flow",
+			Status:    "To Do",
+			UpdatedAt: now.Add(-48 * time.Hour),
+		},
+	}
+}
+
+func JiraCompletedTickets() []model.JiraTicket {
+	now := time.Now()
+	return []model.JiraTicket{
+		{
+			Key:       "ENG-470",
+			Summary:   "Bump terraform providers",
+			UpdatedAt: now.Add(-48 * time.Hour),
+		},
+	}
+}
