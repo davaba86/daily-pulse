@@ -1,6 +1,7 @@
 package render
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -8,6 +9,12 @@ import (
 	"github.com/davaba86/daily-pulse/internal/model"
 	"github.com/fatih/color"
 )
+
+var ansiRE = regexp.MustCompile("\x1b\\[[0-9;]*m")
+
+func stripANSI(s string) string {
+	return ansiRE.ReplaceAllString(s, "")
+}
 
 func fixedNow() time.Time {
 	return time.Date(2026, 10, 18, 8, 2, 0, 0, time.UTC)
@@ -131,6 +138,107 @@ func TestRelativeTime(t *testing.T) {
 		got := relativeTime(now.Add(-c.delta), now)
 		if got != c.want {
 			t.Errorf("relativeTime(-%s) = %q, want %q", c.delta, got, c.want)
+		}
+	}
+}
+
+func TestFormatTable_PipelineStatusColorizedAndAligned(t *testing.T) {
+	color.NoColor = false
+	defer func() { color.NoColor = true }()
+
+	now := fixedNow()
+	pipelines := []model.PipelineRun{
+		{Repo: "davaba86/x", Status: model.PipelinePass, Branch: "main", Duration: 5 * time.Second, UpdatedAt: now},
+		{Repo: "davaba86/y", Status: model.PipelineNone, Branch: "main"},
+	}
+
+	out := FormatTable(nil, pipelines, now, 0)
+
+	if !strings.Contains(out, "\x1b[") {
+		t.Fatalf("FormatTable() pipeline section missing ANSI color codes, got:\n%s", out)
+	}
+
+	var passLine, noneLine string
+	for _, line := range strings.Split(out, "\n") {
+		switch {
+		case strings.Contains(line, "davaba86/x"):
+			passLine = line
+		case strings.Contains(line, "davaba86/y"):
+			noneLine = line
+		}
+	}
+	if passLine == "" || noneLine == "" {
+		t.Fatalf("missing expected pipeline rows in output:\n%s", out)
+	}
+
+	passIdx := strings.Index(stripANSI(passLine), "main")
+	noneIdx := strings.Index(stripANSI(noneLine), "main")
+	if passIdx != noneIdx {
+		t.Errorf("colorized (pass) and uncolored (none) pipeline rows misaligned: BRANCH starts at %d vs %d\ncolorized: %q\nuncolored: %q",
+			passIdx, noneIdx, passLine, noneLine)
+	}
+}
+
+func TestSortPullRequests(t *testing.T) {
+	now := fixedNow()
+	prs := []model.PullRequest{
+		{Title: "older", UpdatedAt: now.Add(-time.Hour)},
+		{Title: "newer", UpdatedAt: now},
+	}
+
+	sorted := SortPullRequests(prs)
+
+	if len(sorted) != 2 || sorted[0].Title != "newer" || sorted[1].Title != "older" {
+		t.Errorf("SortPullRequests() = %+v, want newer first", sorted)
+	}
+	if prs[0].Title != "older" {
+		t.Error("SortPullRequests() should not mutate its input")
+	}
+}
+
+func TestPRRow(t *testing.T) {
+	now := fixedNow()
+	pr := model.PullRequest{
+		Source: "github", Repo: "davaba86/x", Number: 7, Title: "fix thing",
+		Reviewers: []string{"jsmith"}, UpdatedAt: now.Add(-5 * time.Minute),
+	}
+
+	row := PRRow(pr, now)
+
+	want := []string{"GH", "davaba86/x", "7", "fix thing", "jsmith", "5m ago"}
+	if len(row) != len(want) {
+		t.Fatalf("PRRow() = %v, want %d cells", row, len(want))
+	}
+	for i := range want {
+		if row[i] != want[i] {
+			t.Errorf("PRRow()[%d] = %q, want %q", i, row[i], want[i])
+		}
+	}
+}
+
+func TestPRColumnWidths_Stretches(t *testing.T) {
+	now := fixedNow()
+	prs := []model.PullRequest{{Source: "github", Repo: "x", Number: 1, Title: "short", UpdatedAt: now}}
+
+	_, _, _, titleNatural, _, _ := PRColumnWidths(prs, now, 0)
+	_, _, _, titleStretched, _, _ := PRColumnWidths(prs, now, 200)
+
+	if titleStretched <= titleNatural {
+		t.Errorf("PRColumnWidths() TITLE width with width=200 (%d) should exceed natural (%d)", titleStretched, titleNatural)
+	}
+}
+
+func TestPipelinesText(t *testing.T) {
+	now := fixedNow()
+	pipelines := []model.PipelineRun{
+		{Repo: "davaba86/x", Status: model.PipelinePass, Branch: "main", Duration: 5 * time.Second, UpdatedAt: now},
+	}
+
+	out := PipelinesText(pipelines, now)
+
+	for _, want := range []string{"PIPELINES", "davaba86/x", "pass", "main"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("PipelinesText() missing %q, got:\n%s", want, out)
 		}
 	}
 }
