@@ -43,6 +43,20 @@ func terminalWidth() int {
 	return width
 }
 
+// terminalHeight returns the current terminal's row height, or 0 when
+// stdout isn't a terminal — mirrors terminalWidth().
+func terminalHeight() int {
+	fd := int(os.Stdout.Fd())
+	if !term.IsTerminal(fd) {
+		return 0
+	}
+	_, height, err := term.GetSize(fd)
+	if err != nil {
+		return 0
+	}
+	return height
+}
+
 func fetchAll(cfg *config.Config, showAll bool) ([]model.PullRequest, []model.PipelineRun, error) {
 	var prs []model.PullRequest
 	var pipelines []model.PipelineRun
@@ -99,11 +113,12 @@ func NewRootCommand() *cobra.Command {
 			now := time.Now()
 
 			if useMock {
-				output := render.FormatTable(mockdata.PullRequests(), mockdata.PipelineRuns(), now, terminalWidth())
+				prs := mockdata.PullRequests()
+				pipelines := mockdata.PipelineRuns()
 				if interactive {
-					return tui.Run(output)
+					return tui.Run(prs, render.PipelinesText(pipelines, now), now, terminalWidth(), terminalHeight())
 				}
-				cmd.Print(output)
+				cmd.Print(render.FormatTable(prs, pipelines, now, terminalWidth()))
 				return nil
 			}
 
@@ -130,11 +145,10 @@ func NewRootCommand() *cobra.Command {
 				return err
 			}
 
-			output := render.FormatTable(prs, pipelines, now, terminalWidth())
 			if interactive {
-				return tui.Run(output)
+				return tui.Run(prs, render.PipelinesText(pipelines, now), now, terminalWidth(), terminalHeight())
 			}
-			cmd.Print(output)
+			cmd.Print(render.FormatTable(prs, pipelines, now, terminalWidth()))
 			return nil
 		},
 	}
