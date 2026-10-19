@@ -17,10 +17,21 @@ func TestRootCommand_Mock(t *testing.T) {
 	}
 
 	got := out.String()
-	for _, want := range []string{"GITHUB", "GITLAB", "PIPELINES", "open PRs/MRs"} {
+	for _, want := range []string{"OPEN PRs/MRs", "SOURCE", "PIPELINES", "open PRs/MRs"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("output missing %q, got:\n%s", want, got)
 		}
+	}
+}
+
+func TestRootCommand_InteractiveFlagRegistered(t *testing.T) {
+	cmd := NewRootCommand()
+	flag := cmd.Flags().Lookup("interactive")
+	if flag == nil {
+		t.Fatal("--interactive flag not registered")
+	}
+	if flag.DefValue != "false" {
+		t.Errorf("--interactive default = %q, want %q", flag.DefValue, "false")
 	}
 }
 
