@@ -17,7 +17,7 @@ func TestRootCommand_Mock(t *testing.T) {
 	}
 
 	got := out.String()
-	for _, want := range []string{"OPEN PRs/MRs", "SOURCE", "PIPELINES", "open PRs/MRs"} {
+	for _, want := range []string{"OPEN PRs/MRs", "SOURCE", "PIPELINES", "JIRA", "open PRs/MRs"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("output missing %q, got:\n%s", want, got)
 		}

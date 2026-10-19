@@ -118,7 +118,7 @@ func NewRootCommand() *cobra.Command {
 				if interactive {
 					return tui.Run(prs, render.PipelinesText(pipelines, now), now, terminalWidth(), terminalHeight())
 				}
-				cmd.Print(render.FormatTable(prs, pipelines, now, terminalWidth()))
+				cmd.Print(render.FormatTable(prs, pipelines, mockdata.JiraOpenTickets(), mockdata.JiraCompletedTickets(), now, terminalWidth()))
 				return nil
 			}
 
@@ -148,7 +148,7 @@ func NewRootCommand() *cobra.Command {
 			if interactive {
 				return tui.Run(prs, render.PipelinesText(pipelines, now), now, terminalWidth(), terminalHeight())
 			}
-			cmd.Print(render.FormatTable(prs, pipelines, now, terminalWidth()))
+			cmd.Print(render.FormatTable(prs, pipelines, nil, nil, now, terminalWidth()))
 			return nil
 		},
 	}
