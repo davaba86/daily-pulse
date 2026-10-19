@@ -51,49 +51,79 @@ func sourceLabel(source string) string {
 	}
 }
 
+func prNaturalWidths(prs []model.PullRequest, now time.Time) (source, repo, number, title, reviewers, updated int) {
+	source = utf8.RuneCountInString("SOURCE")
+	repo = utf8.RuneCountInString("REPO")
+	number = utf8.RuneCountInString("#/!")
+	title = utf8.RuneCountInString("TITLE")
+	reviewers = utf8.RuneCountInString("REVIEWERS")
+	updated = utf8.RuneCountInString("UPDATED")
+
+	for _, pr := range prs {
+		source = max(source, utf8.RuneCountInString(sourceLabel(pr.Source)))
+		repo = max(repo, utf8.RuneCountInString(pr.Repo))
+		number = max(number, utf8.RuneCountInString(strconv.Itoa(pr.Number)))
+		title = max(title, utf8.RuneCountInString(pr.Title))
+		reviewers = max(reviewers, utf8.RuneCountInString(reviewersCell(pr.Reviewers)))
+		updated = max(updated, utf8.RuneCountInString(relativeTime(pr.UpdatedAt, now)))
+	}
+	return
+}
+
 // titleStretch returns how many extra spaces the TITLE header needs so the
 // table's total width reaches the terminal width, or 0 if the table is
 // already at least that wide naturally.
 func titleStretch(prs []model.PullRequest, now time.Time, width int) int {
-	maxSource := utf8.RuneCountInString("SOURCE")
-	maxRepo := utf8.RuneCountInString("REPO")
-	maxNumber := utf8.RuneCountInString("#/!")
-	maxTitle := utf8.RuneCountInString("TITLE")
-	maxReviewers := utf8.RuneCountInString("REVIEWERS")
-	maxUpdated := utf8.RuneCountInString("UPDATED")
-
-	for _, pr := range prs {
-		maxSource = max(maxSource, utf8.RuneCountInString(sourceLabel(pr.Source)))
-		maxRepo = max(maxRepo, utf8.RuneCountInString(pr.Repo))
-		maxNumber = max(maxNumber, utf8.RuneCountInString(strconv.Itoa(pr.Number)))
-		maxTitle = max(maxTitle, utf8.RuneCountInString(pr.Title))
-		maxReviewers = max(maxReviewers, utf8.RuneCountInString(reviewersCell(pr.Reviewers)))
-		maxUpdated = max(maxUpdated, utf8.RuneCountInString(relativeTime(pr.UpdatedAt, now)))
-	}
-
-	natural := maxSource + maxRepo + maxNumber + maxTitle + maxReviewers + maxUpdated + 5*columnGap
+	source, repo, number, title, reviewers, updated := prNaturalWidths(prs, now)
+	natural := source + repo + number + title + reviewers + updated + 5*columnGap
 	if width <= natural {
 		return 0
 	}
 	return width - natural
 }
 
+// PRColumnWidths returns per-column widths for the OPEN PRs/MRs table, in
+// SOURCE/REPO/#!/TITLE/REVIEWERS/UPDATED order, with TITLE stretched to
+// fill width when width exceeds the natural total — the same rule the
+// static table uses. Used by the interactive session to size its
+// table.Column definitions.
+func PRColumnWidths(prs []model.PullRequest, now time.Time, width int) (source, repo, number, title, reviewers, updated int) {
+	source, repo, number, title, reviewers, updated = prNaturalWidths(prs, now)
+	title += titleStretch(prs, now, width)
+	return
+}
+
+// SortPullRequests returns a copy of prs sorted most-recently-updated
+// first — the same order the static OPEN PRs/MRs table renders in.
+func SortPullRequests(prs []model.PullRequest) []model.PullRequest {
+	sorted := make([]model.PullRequest, len(prs))
+	copy(sorted, prs)
+	sort.Slice(sorted, func(i, j int) bool { return sorted[i].UpdatedAt.After(sorted[j].UpdatedAt) })
+	return sorted
+}
+
+// PRRow returns the display cells for one PR/MR row, in the same column
+// order as the static table: SOURCE, REPO, #/!, TITLE, REVIEWERS, UPDATED.
+func PRRow(pr model.PullRequest, now time.Time) []string {
+	return []string{
+		sourceLabel(pr.Source), pr.Repo, strconv.Itoa(pr.Number), pr.Title,
+		reviewersCell(pr.Reviewers), relativeTime(pr.UpdatedAt, now),
+	}
+}
+
 func writePRSection(buf *bytes.Buffer, prs []model.PullRequest, now time.Time, width int) {
 	if len(prs) == 0 {
 		return
 	}
-	sorted := make([]model.PullRequest, len(prs))
-	copy(sorted, prs)
-	sort.Slice(sorted, func(i, j int) bool { return sorted[i].UpdatedAt.After(sorted[j].UpdatedAt) })
-
+	sorted := SortPullRequests(prs)
 	titleHeader := "TITLE" + strings.Repeat(" ", titleStretch(sorted, now, width))
 
 	buf.WriteString("OPEN PRs/MRs\n")
 	tw := tabwriter.NewWriter(buf, 0, 0, columnGap, ' ', 0)
 	fmt.Fprintf(tw, "SOURCE\tREPO\t#/!\t%s\tREVIEWERS\tUPDATED\n", titleHeader)
 	for _, pr := range sorted {
-		fmt.Fprintf(tw, "%s\t%s\t%d\t%s\t%s\t%s\n",
-			sourceLabel(pr.Source), pr.Repo, pr.Number, pr.Title, reviewersCell(pr.Reviewers), relativeTime(pr.UpdatedAt, now))
+		row := PRRow(pr, now)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n", row[0], row[1], row[2], row[3], row[4], row[5])
 	}
 	tw.Flush()
 	buf.WriteString("\n")
@@ -154,6 +184,14 @@ func writePipelineSection(buf *bytes.Buffer, pipelines []model.PipelineRun, now 
 			padCell(p.Repo, repoW), statusCell, padCell(p.Branch, branchW), padCell(duration, durationW), updated)
 	}
 	buf.WriteString("\n")
+}
+
+// PipelinesText renders just the PIPELINES section, for the interactive
+// session to display alongside its selectable PR/MR table.
+func PipelinesText(pipelines []model.PipelineRun, now time.Time) string {
+	var buf bytes.Buffer
+	writePipelineSection(&buf, pipelines, now)
+	return buf.String()
 }
 
 func FormatTable(prs []model.PullRequest, pipelines []model.PipelineRun, now time.Time, width int) string {

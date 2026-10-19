@@ -179,6 +179,70 @@ func TestFormatTable_PipelineStatusColorizedAndAligned(t *testing.T) {
 	}
 }
 
+func TestSortPullRequests(t *testing.T) {
+	now := fixedNow()
+	prs := []model.PullRequest{
+		{Title: "older", UpdatedAt: now.Add(-time.Hour)},
+		{Title: "newer", UpdatedAt: now},
+	}
+
+	sorted := SortPullRequests(prs)
+
+	if len(sorted) != 2 || sorted[0].Title != "newer" || sorted[1].Title != "older" {
+		t.Errorf("SortPullRequests() = %+v, want newer first", sorted)
+	}
+	if prs[0].Title != "older" {
+		t.Error("SortPullRequests() should not mutate its input")
+	}
+}
+
+func TestPRRow(t *testing.T) {
+	now := fixedNow()
+	pr := model.PullRequest{
+		Source: "github", Repo: "davaba86/x", Number: 7, Title: "fix thing",
+		Reviewers: []string{"jsmith"}, UpdatedAt: now.Add(-5 * time.Minute),
+	}
+
+	row := PRRow(pr, now)
+
+	want := []string{"GH", "davaba86/x", "7", "fix thing", "jsmith", "5m ago"}
+	if len(row) != len(want) {
+		t.Fatalf("PRRow() = %v, want %d cells", row, len(want))
+	}
+	for i := range want {
+		if row[i] != want[i] {
+			t.Errorf("PRRow()[%d] = %q, want %q", i, row[i], want[i])
+		}
+	}
+}
+
+func TestPRColumnWidths_Stretches(t *testing.T) {
+	now := fixedNow()
+	prs := []model.PullRequest{{Source: "github", Repo: "x", Number: 1, Title: "short", UpdatedAt: now}}
+
+	_, _, _, titleNatural, _, _ := PRColumnWidths(prs, now, 0)
+	_, _, _, titleStretched, _, _ := PRColumnWidths(prs, now, 200)
+
+	if titleStretched <= titleNatural {
+		t.Errorf("PRColumnWidths() TITLE width with width=200 (%d) should exceed natural (%d)", titleStretched, titleNatural)
+	}
+}
+
+func TestPipelinesText(t *testing.T) {
+	now := fixedNow()
+	pipelines := []model.PipelineRun{
+		{Repo: "davaba86/x", Status: model.PipelinePass, Branch: "main", Duration: 5 * time.Second, UpdatedAt: now},
+	}
+
+	out := PipelinesText(pipelines, now)
+
+	for _, want := range []string{"PIPELINES", "davaba86/x", "pass", "main"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("PipelinesText() missing %q, got:\n%s", want, out)
+		}
+	}
+}
+
 func TestColorize(t *testing.T) {
 	color.NoColor = false
 	defer func() { color.NoColor = true }()
